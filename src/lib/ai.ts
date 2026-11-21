@@ -61,12 +61,13 @@ const apiKey = rawApiKey.trim();
 
   const emp = record.employee_data;
   const talk = record.initial_talk_data;
+  const report = record.employee_report;
 
   const taskInstructions: Record<InitialTalkAiTopic, string> = {
-    discussion_agenda: `Przygotuj konkretną agendę i punkty do omówienia przez przełożonego podczas rozmowy wstępnej na tym stanowisku (główne obowiązki, standardy pracy w urzędzie, zasady oceny w 5 kryteriach z Załącznika nr 1 i nr 2).`,
-    expectations_and_goals: `Zaproponuj 4-5 mierzalnych oczekiwań i celów wdrożeniowych na okres 8 miesięcy dla tego stanowiska, nawiązujących wprost do 5 elementów oceny z Załącznika nr 1, sformułowanych w profesjonalnym języku administracji publicznej.`,
-    interview_questions: `Zaproponuj 4 konkretne pytania otwarte, które przełożony może zadać pracownikowi podczas rozmowy wstępnej, aby zbadać jego doświadczenie, potrzeby wdrożeniowe i rozumienie kryteriów z Załącznika nr 1.`,
-    custom_prompt: `Odpowiedz na pytanie lub polecenie przełożonego z sekcji DODATKOWY KONTEKST / NOTATKI PRZEŁOŻONEGO. Jeśli dotyczy przepisów oprzyj się na bazie wiedzy prawnej, jeśli pytanie pada o ocenę pracownika oprzyj się na danych pracownika. Jeśli jest ogólne lub spoza tematu, odpowiedz normalnie z własnej wiedzy zachowuj się wtedy normalnie, ale nie twórz nie prawdziwych informacji, na tematy na które nie masz wiedzy.`
+    discussion_agenda: `Przygotuj konkretną agendę i punkty do omówienia przez przełożonego podczas rozmowy wstępnej na tym stanowisku (główne obowiązki, standardy pracy w urzędzie, zasady oceny w 5 kryteriach z Załącznika nr 1 i nr 2). Uwzględnij dotychczasowe obserwacje o pracowniku, jeśli są dostępne.`,
+    expectations_and_goals: `Zaproponuj 4-5 mierzalnych oczekiwań i celów wdrożeniowych na okres 8 miesięcy dla tego stanowiska, nawiązujących wprost do 5 elementów oceny z Załącznika nr 1, sformułowanych w profesjonalnym języku administracji publicznej. Dostosuj je do mocnych stron i obszarów do poprawy pracownika, jeśli zostały podane.`,
+    interview_questions: `Zaproponuj 4 konkretne pytania otwarte, które przełożony może zadać pracownikowi podczas rozmowy wstępnej, aby zbadać jego doświadczenie, potrzeby wdrożeniowe i rozumienie kryteriów z Załącznika nr 1 (nawiązując do jego mocnych stron lub obszarów wymagających wsparcia, jeśli są podane).`,
+    custom_prompt: `Odpowiedz na pytanie lub polecenie przełożonego z sekcji DODATKOWY KONTEKST / NOTATKI PRZEŁOŻONEGO. Jeśli dotyczy przepisów, oprzyj się na bazie wiedzy prawnej; jeśli pytanie dotyczy charakterystyki lub oceny pracownika, przeanalizuj wszystkie dostępne informacje z sekcji DANE PRACOWNIKA Z ARKUSZA (w tym mocne strony, obszary do poprawy i notatki przełożonego). Jeśli pytanie jest ogólne, odpowiedz rzeczowo z własnej wiedzy, nie zmyślając faktów.`
   };
 
   const prompt = `
@@ -76,16 +77,30 @@ Jesteś ekspertem HR i doradcą prawnym w polskiej służbie cywilnej.
 BAZA WIEDZY PRAWNEJ (źródło przepisów — gdy cytujesz lub interpretujesz przepisy, opieraj się na niej i nie zmyślaj numerów paragrafów ani treści):
 ${formattedPromptContext}
 
-DANE PRACOWNIKA Z ARKUSZA:
-- Imię i nazwisko: ${emp.firstName} ${emp.lastName}
+DANE PRACOWNIKA Z ARKUSZA (ZANONIMIZOWANE ZE WZGLĘDU NA RODO):
+- Podmiot oceny: Oceniany pracownik (dane osobowe zanonimizowane)
 - Stanowisko: ${emp.position}
 - Komórka organizacyjna: ${emp.department}
 - Data zatrudnienia: ${emp.startDate}
 - Czy umowa na zastępstwo: ${record.is_replacement ? 'Tak (zgodnie z § 3 obowiązuje 21 dni od ustalenia, że podlega pierwszej ocenie)' : 'Nie'}
 - Termin sprawozdania: ${talk?.reportDeadlineFrom || 'nie wyznaczono'} – ${talk?.reportDeadlineTo || 'nie wyznaczono'}
 - Okres dokonania oceny: ${talk?.evaluationPeriodFrom || 'nie wyznaczono'} – ${talk?.evaluationPeriodTo || 'nie wyznaczono'}
+- Główne obowiązki z rozmowy wstępnej: ${talk?.mainDuties || 'brak danych'}
 
-DODATKOWY KONTEKST / NOTATKI PRZEŁOŻONEGO:
+PROFIL KOMPETENCYJNY I OBSERWACJE Z BAZY:
+- Mocne strony: ${emp.strengths || 'brak wpisu w bazie'}
+- Obszary do poprawy / ryzyka: ${emp.areasForImprovement || 'brak wpisu w bazie'}
+- Dotychczasowe notatki przełożonego: ${emp.supervisorNotes || 'brak wpisu w bazie'}
+
+STATUS FORMALNY I SPRAWOZDANIE (jeśli dotyczy etapu):
+- Egzamin ze służby przygotowawczej: ${record.exam_status || 'brak danych / nie dotyczy'}
+- Sprawozdanie złożone w terminie: ${record.report_on_time === true ? 'Tak' : record.report_on_time === false ? 'Nie' : 'brak danych'}
+- Zrealizowane zadania (ze sprawozdania): ${report?.tasksPerformed || 'brak sprawozdania'}
+- Napotkane problemy i rozwiązania: ${report?.problemsAndSolutions || 'brak danych'}
+- Zdobyte umiejętności: ${report?.skillsAcquired || 'brak danych'}
+- Wnioski usprawniające pracownika: ${report?.improvements || 'brak danych'}
+
+DODATKOWY KONTEKST / POLECENIE PRZEŁOŻONEGO:
 "${userNotes || 'Brak własnych notatek — wygeneruj pełną propozycję bazową dla tego stanowiska.'}"
 
 ZADANIE:
@@ -93,8 +108,11 @@ ${taskInstructions[topic]}
 
 WYMAGANIA:
 - Każde twierdzenie o przepisach (paragrafy, terminy, progi punktowe, warunki oceny) musi wynikać z BAZY WIEDZY PRAWNEJ. Jeśli czegoś w niej nie ma, powiedz to wprost zamiast zgadywać.
-- W pozostałych kwestiach (pomysły na rozmowę, sformułowania, porady, pytania ogólne) korzystaj ze swojej wiedzy i własnego osądu.
-- Odpowiadaj konkretnie, bez wstępów ("Oto propozycja...") ani podsumowań, poprawną polszczyzną.`;
+- Analizując pracownika, odnoś się bezpośrednio do jego cech, notatek i sprawozdania podanych w prompcie (np. łącząc jego zachowania z konkretnymi kryteriami z Załącznika nr 1).
+- W pozostałych kwestiach (pomysły na rozmowę, sformułowania, porady) korzystaj ze swojej wiedzy i własnego osądu.
+- Odpowiadaj konkretnie, bez wstępów ("Oto propozycja...") ani podsumowań, poprawną polszczyzną.
+- Ze względu na anonimizację nie używaj imion, nazwisk ani form z ukośnikami (np. „pracownik/czka”). Jeśli z wiadomości przełożonego jednoznacznie wynika płeć osoby ocenianej (np. używa zaimków „ona/jej” lub „on/jego”), dopasuj do niej formy gramatyczne w swojej odpowiedzi. W pozostałych przypadkach stosuj wyłącznie neutralną terminologię z rozporządzenia: „oceniany” lub „pracownik służby cywilnej” (w rodzaju męskim gramatycznym, zgodnie z językiem aktu prawnego).
+`;
 
     for (const model of TEXT_MODELS_CHAIN) {
         try {
@@ -122,5 +140,5 @@ WYMAGANIA:
         }
     }
 
-  return `[Tryb awaryjny — wygenerowano na podstawie przepisów Dz. U. poz. 1144]\n\n${buildOfflineLegalFallback(record, topic)}`;
+  return `[Błąd agenta, tryb awaryjny — wygenerowano na podstawie przepisów Dz. U. poz. 1144]\n\n${buildOfflineLegalFallback(record, topic)}`;
 }

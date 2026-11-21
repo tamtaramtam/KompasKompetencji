@@ -23,6 +23,9 @@ export interface EvaluationRecord {
     department: string;
     position: string;
     startDate: string;
+    strengths?: string;
+    areasForImprovement?: string;
+    supervisorNotes?: string;
   };
 
   initial_talk_data?: {
@@ -31,10 +34,11 @@ export interface EvaluationRecord {
     reportDeadlineTo: string;
     evaluationPeriodFrom: string;
     evaluationPeriodTo: string;
+    mainDuties?: string;
   };
 
   employee_report?: {
-    submittedAt: string;
+    submittedAt?: string;
     tasksPerformed: string;
     problemsAndSolutions: string;
     skillsAcquired: string;
