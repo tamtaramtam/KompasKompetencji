@@ -3,6 +3,10 @@ import { Sparkles, ArrowLeft, Save, Loader2, Calendar, CheckCircle } from 'lucid
 import { supabase } from '../lib/supabase';
 import { generateInitialTalkHelp, type InitialTalkAiTopic } from '../lib/ai';
 import type { EvaluationRecord } from '../types/evaluation';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
 
 interface Props {
   record: EvaluationRecord;
@@ -189,30 +193,55 @@ export function InitialTalkView({ record, onBack, onSaved }: Props) {
         </div>
 
         {/* PRAWA KOLUMNA: Panel Asystenta AI */}
+        {/* PRAWA KOLUMNA: Panel Asystenta AI */}
         <div className="bg-indigo-50/60 rounded-xl border border-indigo-200 p-6 shadow-sm flex flex-col">
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2 mb-2">
             <Sparkles className="w-5 h-5 text-indigo-600" />
             <h2 className="font-bold text-indigo-950">Asystent AI Rozmowy Wstępnej</h2>
           </div>
 
           <p className="text-xs text-indigo-900/80 mb-3">
-            Wpisz opcjonalne wskazówki lub wygeneruj gotowe materiały do rozmowy na bazie stanowiska (<strong>{emp.position}</strong>) i Rozporządzenia z 2015 r.
+            Zadaj własne pytanie (<strong>Enter</strong> wysyła, <strong>Shift+Enter</strong> nowa linia) lub użyj gotowych skrótów dla stanowiska <strong>{emp.position}</strong>:
           </p>
 
-          <textarea
-            rows={3}
-            value={userNotes}
-            onChange={(e) => setUserNotes(e.target.value)}
-            placeholder="Opcjonalny kontekst dla AI (np. 'pracownik będzie obsługiwał przetargi powyżej progów unijnych, potrzebuje wdrożenia w system e-Zamówienia')..."
-            className="w-full rounded-lg border border-indigo-200 bg-white p-3 text-sm mb-3 focus:border-indigo-500 focus:outline-none"
-          />
+          {/* Pole z obsługą Enter + przycisk Wyślij */}
+          <div className="relative mb-3">
+            <textarea
+              rows={3}
+              value={userNotes}
+              onChange={(e) => setUserNotes(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  if (userNotes.trim() && activeTopic === null) {
+                    handleAskAi('custom_prompt');
+                  }
+                }
+              }}
+              placeholder="Zapytaj AI o przepisy, konkretne cele na to stanowisko lub wpisz kontekst i wciśnij Enter..."
+              className="w-full rounded-lg border border-indigo-200 bg-white p-3 pr-24 text-sm focus:border-indigo-500 focus:outline-none resize-none"
+            />
+            <button
+              type="button"
+              disabled={!userNotes.trim() || activeTopic !== null}
+              onClick={() => handleAskAi('custom_prompt')}
+              className="absolute bottom-2.5 right-2.5 inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 cursor-pointer"
+            >
+              {activeTopic === 'custom_prompt' ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                'Wyślij ↵'
+              )}
+            </button>
+          </div>
 
+          {/* Szybkie akcje 1-klik */}
           <div className="flex flex-wrap gap-2 mb-4">
             <button
               type="button"
               disabled={activeTopic !== null}
               onClick={() => handleAskAi('discussion_agenda')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white text-indigo-700 border border-indigo-300 hover:bg-indigo-50 disabled:opacity-50 cursor-pointer"
             >
               {activeTopic === 'discussion_agenda' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               1. Zakres rozmowy i obowiązki
@@ -245,10 +274,17 @@ export function InitialTalkView({ record, onBack, onSaved }: Props) {
             </div>
           )}
 
-          <div className="flex-1 bg-white rounded-lg border border-indigo-100 p-4 text-sm text-slate-800 whitespace-pre-wrap overflow-y-auto min-h-[220px]">
-            {aiResult || (
+          <div className="md-out flex-1 bg-white rounded-lg border border-indigo-100 p-4 text-sm text-slate-800 overflow-y-auto min-h-[220px]">
+            {aiResult ? (
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeRaw, rehypeSanitize]}
+              >
+                {aiResult}
+              </ReactMarkdown>
+            ) : (
               <span className="text-slate-400 text-xs">
-                Kliknij jeden z przycisków powyżej, aby przetestować odpowiedź modelu Gemini 2.5 Flash...
+                Wpisz pytanie i wciśnij Enter albo wybierz jeden z 3 gotowych scenariuszy powyżej...
               </span>
             )}
           </div>
