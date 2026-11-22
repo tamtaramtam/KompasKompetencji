@@ -67,17 +67,28 @@ const apiKey = rawApiKey.trim();
     discussion_agenda: `Przygotuj konkretną agendę i punkty do omówienia przez przełożonego podczas rozmowy wstępnej na tym stanowisku (główne obowiązki, standardy pracy w urzędzie, zasady oceny w 5 kryteriach z Załącznika nr 1 i nr 2). Uwzględnij dotychczasowe obserwacje o pracowniku, jeśli są dostępne.`,
     expectations_and_goals: `Zaproponuj 4-5 mierzalnych oczekiwań i celów wdrożeniowych na okres 8 miesięcy dla tego stanowiska, nawiązujących wprost do 5 elementów oceny z Załącznika nr 1, sformułowanych w profesjonalnym języku administracji publicznej. Dostosuj je do mocnych stron i obszarów do poprawy pracownika, jeśli zostały podane.`,
     interview_questions: `Zaproponuj 4 konkretne pytania otwarte, które przełożony może zadać pracownikowi podczas rozmowy wstępnej, aby zbadać jego doświadczenie, potrzeby wdrożeniowe i rozumienie kryteriów z Załącznika nr 1 (nawiązując do jego mocnych stron lub obszarów wymagających wsparcia, jeśli są podane).`,
-    custom_prompt: `Odpowiedz na pytanie lub polecenie przełożonego z sekcji DODATKOWY KONTEKST / NOTATKI PRZEŁOŻONEGO. Jeśli dotyczy przepisów, oprzyj się na bazie wiedzy prawnej; jeśli pytanie dotyczy charakterystyki lub oceny pracownika, przeanalizuj wszystkie dostępne informacje z sekcji DANE PRACOWNIKA Z ARKUSZA (w tym mocne strony, obszary do poprawy i notatki przełożonego). Jeśli pytanie jest ogólne, odpowiedz rzeczowo z własnej wiedzy, nie zmyślając faktów.`
-  };
+    custom_prompt: `Odpowiedz na pytanie lub polecenie przełożonego z sekcji DODATKOWY KONTEKST / POLECENIE PRZEŁOŻONEGO. Jeśli dotyczy przepisów, oprzyj się na bazie wiedzy prawnej; jeśli dotyczy charakterystyki lub oceny pracownika, przeanalizuj dostępne informacje z arkusza. Jeśli pytanie wykracza poza tematykę HR, służby cywilnej, oceny pracowniczej lub przepisów prawa pracy/administracji (np. pytania z wiedzy ogólnej, historii, rozrywki), grzecznie odmów i przypomnij, że pomagasz wyłącznie w procesie oceny w służbie cywilnej.`
+};
 
-  const prompt = `
-ROLA:
-Jesteś ekspertem HR i doradcą prawnym w polskiej służbie cywilnej.
+  const prompt = `ROLA: Jesteś ekspertem HR i doradcą prawnym w polskiej służbie cywilnej.
 
 BAZA WIEDZY PRAWNEJ (źródło przepisów — gdy cytujesz lub interpretujesz przepisy, opieraj się na niej i nie zmyślaj numerów paragrafów ani treści):
 ${formattedPromptContext}
 
-DANE PRACOWNIKA Z ARKUSZA (ZANONIMIZOWANE ZE WZGLĘDU NA RODO):
+WYMAGANIA:
+- Każde twierdzenie o przepisach (paragrafy, terminy, progi punktowe, warunki oceny) musi wynikać z BAZY WIEDZY PRAWNEJ. Jeśli czegoś w niej nie ma, powiedz to wprost zamiast zgadywać.
+- Analizując pracownika, odnoś się bezpośrednio do jego cech, notatek i sprawozdania podanych w prompcie (np. łącząc jego zachowania z konkretnymi kryteriami z Załącznika nr 1).
+- W pozostałych kwestiach (pomysły na rozmowę, sformułowania, porady) korzystaj ze swojej wiedzy i własnego osądu.
+- Odpowiadaj konkretnie, bez wstępów ("Oto propozycja...") ani podsumowań, poprawną polszczyzną.
+- Ze względu na anonimizację nie używaj imion, nazwisk ani form z ukośnikami (np. „pracownik/czka”). Jeśli z wiadomości przełożonego jednoznacznie wynika płeć osoby ocenianej (np. używa zaimków „ona/jej” lub „on/jego”), dopasuj do niej formy gramatyczne w swojej odpowiedzi. W pozostałych przypadkach stosuj wyłącznie neutralną terminologię z rozporządzenia: „oceniany” lub „pracownik służby cywilnej” (w rodzaju męskim gramatycznym, zgodnie z językiem aktu prawnego).
+- Wszystkie daty i zakresy dat zapisuj wyłącznie w formacie DD.MM.RRRR (np. 02.11.2026 – 09.11.2026), bez słownych nazw miesięcy.
+- Sprytnie i z gracją unikaj tematów wrażliwych, które nie są istotne dla oceny kompetencji (np. wiek, płeć, orientacja seksualna, religia, poglądy polityczne, niepełnosprawność, stan cywilny, narodowość, pochodzenie etniczne).
+- W przypadku pytań o charakterze ogólnym lub nieprecyzyjnych, które nie są związane z oceną kompetencji czy interpretacją przepisów, odpowiedz wprost, że świadczysz pomoc jedynie w tematach związanych z oceną kompetencji pracowników służby cywilnej, czy interpretujesz przepisy, i nie udzielasz porad prawnych ani personalnych w innych sprawach.
+- Jeśli w prompcie przełożonego nie ma żadnych notatek ani pytań, wygeneruj krótką ale pełną propozycję bazową dla tego stanowiska, opierając się na przepisach i standardach służby cywilnej (Dz. U. z 2015 r. poz. 1144) oraz typowych oczekiwaniach wobec pracowników na tym stanowisku.
+- Przypomnij w swojej odpowiedzi, że ostateczna decyzja i interpretacja przepisów należy do przełożonego, a Twoje sugestie mają charakter wyłącznie doradczy i pomocniczy.
+`;
+
+const userPrompt = `DANE PRACOWNIKA Z ARKUSZA (ZANONIMIZOWANE ZE WZGLĘDU NA RODO):
 - Podmiot oceny: Oceniany pracownik (dane osobowe zanonimizowane)
 - Stanowisko: ${emp.position}
 - Komórka organizacyjna: ${emp.department}
@@ -103,16 +114,7 @@ STATUS FORMALNY I SPRAWOZDANIE (jeśli dotyczy etapu):
 DODATKOWY KONTEKST / POLECENIE PRZEŁOŻONEGO:
 "${userNotes || 'Brak własnych notatek — wygeneruj pełną propozycję bazową dla tego stanowiska.'}"
 
-ZADANIE:
-${taskInstructions[topic]}
-
-WYMAGANIA:
-- Każde twierdzenie o przepisach (paragrafy, terminy, progi punktowe, warunki oceny) musi wynikać z BAZY WIEDZY PRAWNEJ. Jeśli czegoś w niej nie ma, powiedz to wprost zamiast zgadywać.
-- Analizując pracownika, odnoś się bezpośrednio do jego cech, notatek i sprawozdania podanych w prompcie (np. łącząc jego zachowania z konkretnymi kryteriami z Załącznika nr 1).
-- W pozostałych kwestiach (pomysły na rozmowę, sformułowania, porady) korzystaj ze swojej wiedzy i własnego osądu.
-- Odpowiadaj konkretnie, bez wstępów ("Oto propozycja...") ani podsumowań, poprawną polszczyzną.
-- Ze względu na anonimizację nie używaj imion, nazwisk ani form z ukośnikami (np. „pracownik/czka”). Jeśli z wiadomości przełożonego jednoznacznie wynika płeć osoby ocenianej (np. używa zaimków „ona/jej” lub „on/jego”), dopasuj do niej formy gramatyczne w swojej odpowiedzi. W pozostałych przypadkach stosuj wyłącznie neutralną terminologię z rozporządzenia: „oceniany” lub „pracownik służby cywilnej” (w rodzaju męskim gramatycznym, zgodnie z językiem aktu prawnego).
-`;
+ZADANIE: ${taskInstructions[topic]}`;
 
     for (const model of TEXT_MODELS_CHAIN) {
         try {
@@ -124,7 +126,13 @@ WYMAGANIA:
                 },
                 body: JSON.stringify({
                     model,
-                    messages: [{ role: 'user', content: prompt }],
+                    temperature: 0.7,
+                    messages: [
+                        { role: 'user', content: prompt },
+                        { role: 'user', content: userPrompt },
+                    ],
+                    // ograniczenie nadmiarowego myślenia końcowego w modelach openai/gpt-oss, 'low'
+                    ...(model.startsWith('openai/gpt-oss') ? { reasoning_effort: 'low' } : {}),
                 }),
             });
 
